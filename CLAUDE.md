@@ -8,31 +8,33 @@ The system should:
 - classify the incident type
 - retrieve likely runbook guidance
 - return a safe triage summary
-- make it easy to add product, architecture, and implementation artifacts
+- make it easy to generate product, architecture, implementation, and review artifacts through Claude CLI
 
-## Working norms
-- Write plans before major code changes.
-- Keep artifacts in `docs/handoffs/`.
-- Prefer small, readable files.
-- Do not invent infrastructure that is not documented in this repo.
-- Preserve explainability and traceability for AI outputs.
-- Flag open risks clearly.
+## Delivery norms
+- Read the relevant spec before making changes.
+- Keep all cross-agent communication in `docs/handoffs/`.
+- Preserve traceability from product brief to architecture to implementation.
+- Prefer small, readable files and minimal local dependencies.
+- When uncertain, document assumptions explicitly instead of inventing hidden scope.
+- Optimize for a strong POC that can be demoed and extended, not for premature infrastructure complexity.
 
-## Standard delivery flow
-1. Read the use case in `docs/specs/ai-triage-use-case.md`
-2. Create/update `docs/handoffs/product-brief.md`
-3. Create/update `docs/handoffs/architecture.md`
-4. Create/update `docs/handoffs/implementation-plan.md`
-5. Implement only the approved scope in `src/`
+## Operational guardrails
+- No external API calls for the sample app.
+- Keep the implementation locally runnable with Python.
+- Response language must clearly state that the assistant is advisory, not a final authority.
+- Retrieval can remain local and in-memory for the MVP, but interfaces should leave room for productionization later.
 
-## Commands
-```bash
-python3 src/app.py
-python3 -m py_compile src/*.py
-```
+## Repository conventions
+- Source code lives in `src/`.
+- Specs live in `docs/specs/`.
+- Agent handoffs live in `docs/handoffs/`.
+- Timestamped orchestration artifacts live in `artifacts/runs/`.
+- Local validation should use `python3 -m py_compile src/*.py` and `python3 -m unittest discover -s tests -p 'test_*.py'` where possible.
 
-## Tech assumptions
-- Python sample app for easy portability
-- Retrieval is mocked with local data
-- No external API dependency
-- This repo demonstrates Claude Code CLI workflow, not production infra
+## What good looks like
+A strong output from this repo should include:
+- a clear product brief with testable acceptance criteria
+- a practical architecture with component boundaries and trade-offs
+- working local code with simple validation
+- review notes that identify real gaps and follow-up work
+- a run folder that lets an operator audit what happened

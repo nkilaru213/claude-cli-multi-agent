@@ -1,118 +1,202 @@
-# Claude CLI Multi-Agent Sample
+# Claude CLI Multi-Agent System (Production-Style POC)
 
-# Sample Repo
+This repository is a production-style proof of concept for a multi-agent delivery workflow built around Claude CLI.
 
-This sample repo shows how to run a **product**, **architect**, and **developer** agent in Claude Code (CLI) using **project-level subagents** under `.claude/agents/`.
+It is designed for a realistic internal AI solution flow where specialized agents collaborate through explicit handoff documents, generated code, review notes, and timestamped run artifacts.
 
-It is designed for a practical use case:
+## What this repo demonstrates
 
-> Build a well-managed internal AI solution for incident triage and knowledge retrieval.
+- a **Product agent** that turns a spec into a testable product brief
+- an **Architect agent** that produces implementation-ready system design
+- a **Developer agent** that updates code and implementation notes
+- a **Reviewer agent** that checks scope alignment, maintainability, and risks
+- a **Coordinator mode** for end-to-end orchestration through Claude CLI
+- a **Feedback-loop mode** for reviewer-driven rework
+- a local **AI triage assistant** sample app that acts as the implementation target
 
-The flow is:
+## Why this is stronger than a basic demo
 
-1. **product-agent** turns the business ask into a scoped product brief.
-2. **architect-agent** turns the brief into an implementation architecture.
-3. **developer-agent** turns the architecture into working code/tasks.
-4. A **coordinator agent** orchestrates the three and writes handoff artifacts into `docs/handoffs/`.
+This repo is structured so your POC looks more like an engineering system than a one-off prompt chain:
 
-## Why this pattern
+- explicit artifact handoffs in `docs/handoffs/`
+- run snapshots in `artifacts/runs/<timestamp>/`
+- reproducible scripts for sequential, coordinator, and feedback-loop execution
+- local validation with Python tests
+- a sample app with structured models, retrieval logic, CLI input handling, and safer triage output
 
-Claude Code supports **custom subagents** in `.claude/agents/`. Project-level subagents are shared with the team through git, and Claude can delegate based on each agent's `description`. Claude Code also supports restricting which agents a coordinator can spawn using `Agent(agent-name)` in the subagent tools field. Official docs describe `.claude/agents/` as the project location for subagents, YAML frontmatter as the definition format, and `Agent(...)` as the way to allow a main-thread agent to delegate to specific subagents. citeturn305665view0turn353157view1turn353157view3
-
-## Repo structure
+## Repository structure
 
 ```text
-claude-cli-multi-agent-sample/
-├── CLAUDE.md
+.
 ├── .claude/
-│   ├── settings.json
 │   ├── agents/
-│   │   ├── coordinator-agent.md
-│   │   ├── product-agent.md
-│   │   ├── architect-agent.md
-│   │   └── developer-agent.md
-│   └── skills/
-│       └── solution-delivery-workflow/
-│           └── SKILL.md
+│   └── settings.json
+├── artifacts/
+│   └── runs/
 ├── docs/
-│   ├── specs/
-│   │   └── ai-triage-use-case.md
-│   └── handoffs/
-│       ├── product-brief.md
-│       ├── architecture.md
-│       └── implementation-plan.md
+│   ├── handoffs/
+│   └── specs/
 ├── scripts/
-│   ├── run-coordinator.sh
+│   ├── run_pipeline.py
 │   ├── run-sequential.sh
-│   └── notify-subagent-stop.sh
-└── src/
-    ├── app.py
-    ├── retriever.py
-    └── triage.py
+│   ├── run-feedback-loop.sh
+│   └── run-coordinator.sh
+├── src/
+│   ├── app.py
+│   ├── models.py
+│   ├── retriever.py
+│   └── triage.py
+└── tests/
+    └── test_triage.py
 ```
 
-## Requirements
+## Prerequisites
 
-- Claude Code installed
-- Logged in with `claude auth login`
-- Run from the repo root
+- Python 3.10+
+- Claude CLI installed and authenticated
+- a shell environment where `claude` is available on `PATH`
 
-Claude Code CLI supports starting interactive sessions, continuing sessions, checking auth state, listing agents, and choosing an agent for the current session with `--agent`. citeturn319094search3turn305665view0
+## Claude CLI setup
 
-## Quick start
-
-### 1. Enter the repo
+Install and authenticate Claude CLI using your preferred internal or official workflow. This repo assumes the following is true before you run it:
 
 ```bash
-cd claude-cli-multi-agent-sample
+claude --help
 ```
 
-### 2. Check authentication
+If that command fails, the orchestration wrapper will stop early and tell you Claude CLI is missing.
+
+## Core run modes
+
+### 1. Sequential mode
+
+Runs the four specialist agents in a fixed order.
 
 ```bash
-claude auth status --text
+bash scripts/run-sequential.sh
 ```
 
-### 3. See project agents
+### 2. Coordinator mode
 
-```bash
-claude agents
-```
-
-### 4. Run the coordinator in an interactive session
-
-```bash
-claude --agent coordinator-agent
-```
-
-Then paste this prompt:
-
-```text
-Deliver the AI triage assistant described in docs/specs/ai-triage-use-case.md.
-Use the product-agent first, then the architect-agent, then the developer-agent.
-Make each agent write its handoff into docs/handoffs/.
-At the end, summarize risks, open decisions, and next steps.
-```
-
-## Alternative: one-shot non-interactive style
-
-You can also use the helper script:
+Lets the coordinator own the workflow and handoffs.
 
 ```bash
 bash scripts/run-coordinator.sh
 ```
 
-## How the agents communicate
+### 3. Feedback-loop mode
 
-Subagents do not directly spawn each other. The **coordinator** is the parent agent and delegates work to the others. The communication model here is:
+Runs the main pipeline, reads reviewer notes, and optionally triggers one or more developer rework passes.
 
-- shared repo context
-- explicit task briefs in prompts
-- written handoff files in `docs/handoffs/`
-- optional project hooks for visibility
+```bash
+bash scripts/run-feedback-loop.sh
+```
 
-This matches Claude Code’s model: subagents run in their own context, and when you need coordination across specialized agents, the main agent delegates and synthesizes results. Claude’s docs also note that subagents themselves cannot spawn subagents. citeturn305665view0turn353157view1
+## Using a different spec
 
-## Notes for your company structure
+All run scripts accept a spec path as the first argument.
 
-Your screenshot shows an `agents/` folder at repo root. For Claude Code itself, the documented project-level subagent location is **`.claude/agents/`**. If your company wants a visible root-level `agents/` folder too, keep it as documentation/templates, but place the real Claude Code subagent definitions under `.claude/agents/` so Claude can load them automatically. citeturn305665view0turn305665view1
+```bash
+bash scripts/run-sequential.sh docs/specs/ai-triage-use-case.md
+```
+
+## Run artifacts
+
+Every pipeline execution creates a timestamped folder under `artifacts/runs/`.
+
+Each run contains:
+
+- `run-metadata.json`
+- `run-summary.json`
+- per-stage CLI logs
+- a snapshot of generated handoff markdown files
+- `FAILED.txt` if orchestration stops because a Claude stage fails
+
+This makes your POC much easier to demo, debug, and audit.
+
+## Local app usage
+
+The sample implementation target is a local AI incident triage assistant.
+
+### Interactive mode
+
+```bash
+python3 src/app.py
+```
+
+### One-shot mode
+
+```bash
+python3 src/app.py --incident "The nightly billing job failed again and warehouse connections are timing out."
+```
+
+### Compact JSON mode
+
+```bash
+python3 src/app.py --incident "Critical outage affecting all users" --json
+```
+
+## Validation
+
+### Syntax check
+
+```bash
+python3 -m py_compile src/*.py
+```
+
+### Unit tests
+
+```bash
+python3 -m unittest discover -s tests -p 'test_*.py'
+```
+
+## Multi-agent contract
+
+The system is intentionally handoff-driven.
+
+1. Product writes `docs/handoffs/product-brief.md`
+2. Architecture consumes that brief and writes `docs/handoffs/architecture.md`
+3. Development consumes both handoffs, updates `src/`, and writes `docs/handoffs/implementation-plan.md`
+4. Review checks implementation quality and writes `docs/handoffs/review-notes.md`
+5. Orchestration snapshots those artifacts into a timestamped run directory
+
+This makes the flow easy to inspect and extend.
+
+## Recommended demo flow for your POC
+
+For a polished demo:
+
+1. show the input spec in `docs/specs/`
+2. run `bash scripts/run-feedback-loop.sh`
+3. open the latest folder under `artifacts/runs/`
+4. show the handoff evolution and logs
+5. run `python3 src/app.py --incident "..."` to show the final implementation working
+
+That sequence makes the project feel much closer to a real internal engineering workflow.
+
+## Production-minded improvements already included
+
+- stricter agent role boundaries
+- explicit handoff files
+- timestamped run artifacts
+- stage-level CLI logging
+- local test coverage for triage behavior
+- structured response fields such as confidence, escalation owner, and disclaimer
+- safer next-step guidance instead of overconfident recommendations
+
+## Strong next upgrades
+
+If you want to push this beyond POC and into a stronger platform story, the best next additions are:
+
+- a small web UI for viewing specs, handoffs, and run history
+- JSON schema validation for handoff documents
+- a `security-agent` and `qa-agent`
+- a real knowledge base persisted outside Python source
+- containerization with Docker
+- CI checks that run tests and linting automatically
+
+## Notes
+
+- This repo uses Claude CLI, not the Claude API.
+- CLI syntax can vary slightly by installation or enterprise wrapper. If your environment uses a different command shape, update `scripts/run_pipeline.py` in one place instead of rewriting every run script.
+- The sample app is still intentionally lightweight; the value of the repo is the multi-agent workflow and artifact traceability.
