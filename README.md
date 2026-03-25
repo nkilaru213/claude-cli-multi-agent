@@ -1,5 +1,7 @@
 # Claude CLI Multi-Agent Sample
 
+# Sample Repo
+
 This sample repo shows how to run a **product**, **architect**, and **developer** agent in Claude Code (CLI) using **project-level subagents** under `.claude/agents/`.
 
 It is designed for a practical use case:
